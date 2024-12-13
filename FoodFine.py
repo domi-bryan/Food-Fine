@@ -1,5 +1,4 @@
-#Wheee
-from __future__ import print_function
+# Imports
 from tabulate import tabulate
 from tabula.io import read_pdf
 import pandas as pd
@@ -17,18 +16,22 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import subprocess
+from PyPDF2 import PdfFileReader
 
     
-#reads table from pdf file
-list_1 = read_pdf("/Users/domi_bryan/Food_Fine_Records/Current.pdf",pages="1") #address of pdf 
-df = pd.DataFrame(np.concatenate(list_1))
+# Reads table from pdf file
+pdf_path = "/Users/domi_bryan/Food_Fine_Records/Current.pdf"
+pdf = PdfFileReader(open(pdf_path, "rb"))
+num_pages = pdf.getNumPages()
 
-#list_2 = read_pdf("/Users/domi_bryan/Food_Fine_Records/Current.pdf",pages="2") #address of pdf file
-#df_2 = pd.DataFrame(np.concatenate(list_2))
-#df_2.drop(df_2.head(1).index,inplace=True)
-#df=pd.concat([df_1,df_2],ignore_index=True)
+df_list = []
+for page in range(1, num_pages + 1):
+    df_list.append(pd.DataFrame(np.concatenate(read_pdf(pdf_path, pages=str(page)))))
 
-#Cleaning and Reformating
+df = pd.concat(df_list, ignore_index=True)
+
+# Cleaning and Reformating
+
 df = df.fillna('')
 df.columns = df.iloc[0]
 df = df[1:]
@@ -40,7 +43,7 @@ total_cost = total_cost.replace("$", "")
 total_cost = float(total_cost)
 #print(total_cost)
 
-#Tail checker
+# Tail checker
 tail_checker = df['S/N'].iloc[-1]
 df.drop(df.tail(1).index,inplace=True)
 
@@ -57,11 +60,12 @@ for name in names:
     temp_sum = df.loc[df['Full_Name'] == name, 'Cost'].sum()
     print(" • {}: ${}".format(name, temp_sum)) #Yikes
     total_sum = total_sum + temp_sum
+
 flagsend = False
 if(df['S/N'].iloc[0]!='1'):
     print(df['S/N'][0])
-    print("The table head got cut off. Readjust code.")
-elif(tail_checker!='Total Hall 8'):
+    print("The table head got cut off. Re-adjust code.")
+elif(tail_checker!='Total'):
     #print(tail_checker)
     print("The table tail got cut off. Readjust code.")
 elif(total_sum>total_cost):
@@ -71,6 +75,7 @@ elif(total_sum<total_cost):
 else:
     print("The total sum is ${}, the same as the total cost of ${}.\n\n".format(total_sum, total_cost))
     flagsend = True
+
 if(flagsend==False):
     override = input("Override Anyway?[Y/N]")
     if(override == 'Y'):
@@ -92,8 +97,7 @@ if(tomorrow.day<10):
     renameIndex = "0"+str(tomorrow.day) + "-" + calendar.month_abbr[tomorrow.month]
 else:
     renameIndex = str(tomorrow.day) + "-" + calendar.month_abbr[tomorrow.month]
-rfc_collect = datetime.datetime(tomorrow.year, tomorrow.month, tomorrow.day, 22, 0, 0, 000).isoformat() + 'Z'
-rfc_pay = datetime.datetime(tomorrow.year, tomorrow.month, tomorrow.day+1, 22, 0, 0, 000).isoformat() + 'Z'
+
 flagrename = input("Store files in archives?[Y/N] ")
 if (flagrename == 'Y'):
     os.rename("/Users/domi_bryan/Food_Fine_Records/Current.pdf", "/Users/domi_bryan/Food_Fine_Records/Previous_Records/{}.pdf".format(renameIndex))
@@ -129,13 +133,16 @@ if (flagrename == 'Y'):
     wks_total.update_value('D51', "=SUM(D$2:D$49)")
 
     print("A copy of the dataframe has been uploaded to Google Sheets as '{}'.\n".format(renameIndex))
-
     print("Creating Reminders...\n")
+   
     SCOPES = ['https://www.googleapis.com/auth/tasks']
+
     creds = None
+    
     # The file token.json stores the user's access and refresh tokens, and is
     if os.path.exists('token.json'):
         creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+    
     # If there are no (valid) credentials available, let the user log in.
     if not creds or not creds.valid:
         flow = InstalledAppFlow.from_client_secrets_file(
@@ -148,8 +155,11 @@ if (flagrename == 'Y'):
     try:
         service = build('tasks', 'v1', credentials=creds)
         # Call the Tasks API
+        rfc_collect = datetime.datetime(tomorrow.year, tomorrow.month, tomorrow.day, 22, 0, 0, 000).isoformat() + 'Z'
+        rfc_pay = datetime.datetime(tomorrow.year, tomorrow.month, tomorrow.day+1, 22, 0, 0, 000).isoformat() + 'Z'
         collect = service.tasks().insert(tasklist='redacted', body={'title': 'Collect Food Fine', 'due': rfc_collect}).execute()
         collect = service.tasks().insert(tasklist='redacted', body={'title': 'Pay Food Fine to Boarding School', 'due': rfc_pay}).execute()
+
     except HttpError as err:
         print(err)
     print("Reminders Created.")
