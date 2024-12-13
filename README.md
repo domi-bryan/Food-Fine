@@ -1,4 +1,4 @@
-# Food Fine Python Script
+# Food Fine Automation Python Script
 A Program to automate food fine collection. Sums up the fine incurred by each individual and provides and checks whether the amount due to the boarding school office is equal to the sum of fines of all individuals.
 
 The program then stores the fines in a dedicated google sheet to keep track of how much fine each individual incurs over the year using the pygsheets library. In another sheet, it updates the the names and values of individuals who owed food fine that week.
